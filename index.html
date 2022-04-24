@@ -5,30 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>OMS Example</title>
     
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+    
   </head>
   <body>
     <div id='map'></div>
     
     <script type="module">
-        const elMap = document.getElementById('map');
-        console.log(elMap.style)
-        let gMap;
+      const elMap = document.getElementById('map');
+      elMap.style.width = `${window.innerWidth}px`;
+      elMap.style.height = `${window.innerHeight}px`;
+      
+      let gMap;
+      let gMarkers = [];
+      window.initMap = () => {
+        console.log('Initializing the map...');
         
-    	function initMap() {
-			console.log('Initializing the map...');
-			
-			const gmap = google.maps.Map(
-				elMap
-    			{
-					zoom: 11,
-					center: { lat: 62.323907, lng: -150.109291 },
-					mapTypeId: 'roadmap',
- 			   }
-			);
-		}
+        gMap = new google.maps.Map(
+          elMap,
+          {
+            zoom: 11,
+            center: { lat: 49, lng: -97 },
+            // mapTypeId: 'roadmap',
+          }
+        );
+        console.log('Map initialized!');
+
+        gMarkers.push(new google.maps.Marker({
+          map: gMap,
+          position: {
+            lat: 49,
+            lng: -97
+          }
+        }));
+      }
     </script>
     <script async
-        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=geometry&callback=initMap">
+        src="https://maps.googleapis.com/maps/api/js?key=NO_KEY&libraries=geometry&callback=initMap">
     </script>
   </body>
 </html>
