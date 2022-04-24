@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>OMS Example</title>
+    <title>Grouped Markers Example</title>
     
     <style>
       body {
@@ -16,36 +16,68 @@
     <div id='map'></div>
     
     <script type="module">
+      import env from './scripts/env.js';
+      import { loadGoogleMapsLibrary } from './scripts/utils.js';
+      import GroupedMarkers from './scripts/GroupedMarkers.js';
+    
+      // Load google maps library
+      loadGoogleMapsLibrary(env.GOOGLE_API_KEY);
+    
       const elMap = document.getElementById('map');
       elMap.style.width = `${window.innerWidth}px`;
       elMap.style.height = `${window.innerHeight}px`;
       
       let gMap;
       let gMarkers = [];
-      window.initMap = () => {
+      let groupedMarkers;
+      window.initMap = async () => {
         console.log('Initializing the map...');
         
         gMap = new google.maps.Map(
           elMap,
           {
             zoom: 11,
-            center: { lat: 49, lng: -97 },
+            center: { lat: 49.5, lng: -97 },
             // mapTypeId: 'roadmap',
           }
         );
         console.log('Map initialized!');
 
+        console.log('Creating markers...');
         gMarkers.push(new google.maps.Marker({
           map: gMap,
           position: {
-            lat: 49,
+            lat: 49.5,
             lng: -97
           }
         }));
+        
+        gMarkers.push(new google.maps.Marker({
+          map: gMap,
+          position: {
+            lat: 49.5,
+            lng: -97.01
+          }
+        }));
+        
+        gMarkers.push(new google.maps.Marker({
+          map: gMap,
+          position: {
+            lat: 49.51,
+            lng: -97.005
+          }
+        }));
+        console.log('Markers created!');
+        
+        console.log('Grouping markers...');
+        groupedMarkers = new GroupedMarkers(google, gMap);
+        groupedMarkers.addMarker(gMarkers[0]);
+        groupedMarkers.addMarker(gMarkers[1]);
+        groupedMarkers.addMarker(gMarkers[2]);
+        console.log('Markers grouped!');
+        
+        await groupedMarkers.groupAll();
       }
-    </script>
-    <script async
-        src="https://maps.googleapis.com/maps/api/js?key=NO_KEY&libraries=geometry&callback=initMap">
     </script>
   </body>
 </html>
