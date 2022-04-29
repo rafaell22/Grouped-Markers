@@ -9,6 +9,11 @@
       body {
         margin: 0;
       }
+      
+      #grid {
+        position: absolute;
+        pointer-events: none;
+      }
     </style>
     
   </head>
@@ -18,7 +23,7 @@
     <script type="module">
       import env from './scripts/env.js';
       import { loadGoogleMapsLibrary } from './scripts/utils.js';
-      import GroupedMarkers from './scripts/GroupedMarkers.js';
+      import GroupMarkers from './scripts/GroupMarkers.js';
     
       // Load google maps library
       loadGoogleMapsLibrary(env.GOOGLE_API_KEY);
@@ -29,7 +34,8 @@
       
       let gMap;
       let gMarkers = [];
-      let groupedMarkers;
+      let gGroupMarkers = [];
+      let groupMarkers;
       window.initMap = async () => {
         console.log('Initializing the map...');
         
@@ -43,40 +49,100 @@
         );
         console.log('Map initialized!');
 
+        const northEast = {
+          lat: 49.70847735110257,
+          lng: -96.54441070556639
+        };
+        
+        const southWest = {
+          lat: 49.29063067959251,
+          lng: -97.45558929443358,
+        };
+        
+        const coords = [];
+        let currentLat;
+        let currentLng;
+        for(let coordIndex = (100 - 1); coordIndex > -1; coordIndex--) {
+          currentLng = Math.random() * (northEast.lng - southWest.lng) + southWest.lng;
+          currentLat = Math.random() * (northEast.lat - southWest.lat) + southWest.lat;
+          coords.push({
+            lat: currentLat,
+            lng: currentLng,
+          })
+        }
+        
+        console.log('coords: ', coords);
+
         console.log('Creating markers...');
-        gMarkers.push(new google.maps.Marker({
-          map: gMap,
-          position: {
-            lat: 49.5,
-            lng: -97
-          }
-        }));
-        
-        gMarkers.push(new google.maps.Marker({
-          map: gMap,
-          position: {
-            lat: 49.5,
-            lng: -97.01
-          }
-        }));
-        
-        gMarkers.push(new google.maps.Marker({
-          map: gMap,
-          position: {
-            lat: 49.51,
-            lng: -97.005
-          }
-        }));
+        for(let coordIndex = (coords.length - 1); coordIndex > -1; coordIndex--) {
+          gMarkers.push(new google.maps.Marker({
+            map: gMap,
+            position: coords[coordIndex]
+          }));
+        }
         console.log('Markers created!');
         
-        console.log('Grouping markers...');
-        groupedMarkers = new GroupedMarkers(google, gMap);
-        groupedMarkers.addMarker(gMarkers[0]);
-        groupedMarkers.addMarker(gMarkers[1]);
-        groupedMarkers.addMarker(gMarkers[2]);
-        console.log('Markers grouped!');
+        console.log('Creating visual aids...');
+        // create canvas to overlay map
+        const gridCanvas = document.createElement('CANVAS');
+        gridCanvas.id = 'grid';
+        gridCanvas.style.top = '0px';
+        gridCanvas.style.left = '0px';
+        gridCanvas.width = window.innerWidth;
+        gridCanvas.height = window.innerHeight;
+        document.querySelector('body').append(gridCanvas);
+        const gridContext = gridCanvas.getContext('2d');
         
-        await groupedMarkers.groupAll();
+        // calculate and draw the grid over the map
+        const cellSize = GroupMarkers.prototype.DEFAULT_SETTINGS.THRESHOLD * 2; // in pixels, double the threshold value
+        const rows = Math.ceil(gridCanvas.height / cellSize);
+        const columns = Math.ceil(gridCanvas.width / cellSize);
+        // dra the rows
+        gridContext.beginPath();
+        for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
+          gridContext.moveTo(0, rowIndex * cellSize);
+          gridContext.lineTo(gridCanvas.width, rowIndex * cellSize);
+          gridContext.fillText(rowIndex, 10, rowIndex * cellSize + 10);
+        }
+        gridContext.stroke();
+        // draw teh columns
+        gridContext.beginPath();
+        for(let columnIndex = 0; columnIndex < columns; columnIndex++) {
+          gridContext.moveTo(columnIndex * cellSize, 0);
+          gridContext.lineTo(columnIndex * cellSize, gridCanvas.height);
+          gridContext.fillText(columnIndex, columnIndex * cellSize + 10, 10);
+        }
+        gridContext.stroke();
+        
+        console.log('Combining markers...');
+        groupMarkers = new GroupMarkers(google, gMap);
+        
+        // draw rects on cells with markers
+        // let markerPoint;
+        // let currentCol;
+        // let currentRow;
+        // for (const marker of gMarkers) {
+        //   markerPoint = await groupMarkers.fromLatLngToPixel(marker);
+        //   marker._gPoint = markerPoint;
+        //   currentRow = Math.floor(markerPoint.y / cellSize);
+        //   currentCol = Math.floor(markerPoint.x / cellSize);
+        //   gridContext.fillStyle = '#00000055';
+        //   gridContext.fillRect(
+        //     currentCol * cellSize,
+        //     currentRow * cellSize,
+        //     cellSize,
+        //     cellSize,
+        //   );
+        // }
+        
+        for(let markerIndex = (gMarkers.length - 1); markerIndex > -1; markerIndex--) {
+          groupMarkers.addMarker(gMarkers[markerIndex]);
+        }
+        
+        await groupMarkers.fromLatLngToPixel(gMarkers[0]);
+        await groupMarkers.groupByGrid();
+        await groupMarkers.groupByRelativeDistance();
+        console.log('Markers combined!');
       }
     </script>
   </body>

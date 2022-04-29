@@ -18,12 +18,37 @@ LatLng.prototype.isValid = function(position) {
   return position && position.x && position.y;
 }
 
-function Group(markersIndexes, marker) {
-  this.markersIndexes = markersIndexes;
-  this.marker = marker;
+function Group(map, position, markers, icon) {
+  this.map = map;
+  this.marker = new google.maps.Marker({
+    map: map,
+    position: {
+      lat: position.lat,
+      lng: position.lng
+    },
+    icon: {
+      url: icon || '../images/groupedMarkersBlue.svg',
+      size: {
+        width: 32,
+        height: 32
+      },
+      scaledSize: {
+        width: 32,
+        height: 32
+      },
+      anchor: {
+        x: 16,
+        y: 16,
+      },
+    },
+    label: `${markers.length}`,
+  });
+  
+  this.markers = markers;
+  this.markers.forEach(marker => marker.setVisible(false));
 }
 
-function GroupedMarkers(google, map, options) {
+function GroupMarkers(google, map, options) {
 	Object.assign(this, this.DEFAULT_SETTINGS, options);
 	
 	this.google = google;
@@ -48,22 +73,133 @@ function GroupedMarkers(google, map, options) {
   this.overlay.setMap(map);
 }
 
-GroupedMarkers.prototype.addMarker = function(marker, shouldRecalculate) {
+GroupMarkers.prototype.addMarker = function(marker, shouldRecalculate) {
   marker._gId = this._lastId++;
   this.markers.push(marker);
   return;
 };
 
 // TODO - add logic in case "shouldRecalculate" is true
-GroupedMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
+GroupMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
   let markerIds = [];
   for(let markerIndex = 0; markerIndex < markers.length; markerIndex++) {
     this.addMarker(markers[markerId]);
   }
 };
 
-// TODO - implement basic logic to group markers
-GroupedMarkers.prototype.groupAll = async function() {
+GroupMarkers.prototype.groupByGrid = async function() {
+  const startTime = (new Date()).getTime();
+  const cellSize = this.THRESHOLD * 2;
+  const cells = {};
+  let markerPoint;
+  let currentCol;
+  let currentRow;
+  for (const marker of this.markers) {
+    // TODO - instead of getting pixel point for each marker, convert cellsize and then doo all the calculations in latlngs
+    //        This way, we only need to convert once
+    markerPoint = await this.fromLatLngToPixel(marker);
+    marker._gPoint = markerPoint;
+    currentRow = Math.floor(markerPoint.y / cellSize);
+    currentCol = Math.floor(markerPoint.x / cellSize);
+    if (cells[`${currentRow}_${currentCol}`]) {
+      cells[`${currentRow}_${currentCol}`].push(marker);
+    } else {
+      cells[`${currentRow}_${currentCol}`] = [ marker ];
+    }
+  }
+
+  for (const cell in cells) {
+    const row = cell.split('_')[0];
+    const col = cell.split('_')[1];
+    if (cells[cell]) {
+      if (
+        cells[cell].length > 1
+      ) {
+        this.groups.push(new Group(
+          this.map,
+          await this.fromPixelToLatLng({
+            x: col * cellSize + (cellSize / 2),
+            y: row * cellSize + (cellSize / 2),
+          }),
+          cells[cell]
+        ));
+        cells[cell] = null;
+      } else {
+        // if a cell has only 1 marker, we try to merge it wtth other cells around it that have only 1 marker
+        if (
+          cells[`${row - 1}_${col}`] &&
+          cells[`${row - 1}_${col}`].length === 1
+        ) {
+          // check the cell at the top
+          this.groups.push(new Group(
+            this.map,
+            await this.fromPixelToLatLng({
+              x: col * cellSize + (cellSize / 2),
+              y: row * cellSize,
+            }),
+            cells[cell].concat(cells[`${row - 1}_${col}`])
+          ));
+
+          cells[cell] = null;
+          cells[`${row - 1}_${col}`] = null;
+        } else if(
+          cells[`${row}_${col + 1}`] && 
+          cells[`${row}_${col + 1}`].length === 1
+        ) {
+          // check the call at the right
+          this.groups.push(new Group(
+            this.map,
+            await this.fromPixelToLatLng({
+              x: (col + 1) * cellSize,
+              y: row * cellSize + (cellSize / 2),
+            }),
+            cells[cell].concat(cells[`${row}_${col + 1}`])
+          ));
+
+          cells[cell] = null;
+          cells[`${row}_${col + 1}`] = null;
+        } else if(
+          cells[`${row + 1}_${col}`] &&
+          cells[`${row + 1}_${col}`].length === 1
+        ) {
+          // check the cell at the bottom
+          this.groups.push(new Group(
+            this.map,
+            await this.fromPixelToLatLng({
+              x: col * cellSize + (cellSize / 2),
+              y: (row + 1) * cellSize,
+            }),
+            cells[cell].concat(cells[`${row + 1}_${col}`])
+          ));
+          
+          cells[cell] = null;
+          cells[`${row + 1}_${col}`] = null;
+        } else if(
+          cells[`${row}_${col - 1}`] &&
+          cells[`${row}_${col - 1}`].length === 1
+        ) {
+          // check the cell at the left
+          this.groups.push(new Group(
+            this.map,
+            await this.fromPixelToLatLng({
+              x: col * cellSize,
+              y: row * cellSize + (cellSize / 2),
+            }),
+            cells[cell].concat(cells[`${row}_${col - 1}`])
+          ));
+
+          cells[cell] = null;
+          cells[`${row}_${col - 1}`] = null;
+        }
+      }
+    }
+  }
+  
+  console.log('grouByGrid took %n ms', (new Date()).getTime() - startTime);
+};
+
+GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
+  const startTime = (new Date()).getTime();
   let currentMarker;
   let currentGroup;
   let currentDistance;
@@ -99,21 +235,25 @@ GroupedMarkers.prototype.groupAll = async function() {
         );
         
         currentGroupLatLng = await this.fromPixelToLatLng(currentAveragePosition);
-        groups.push(new Group (
-          currentGroup,
-          new this.google.maps.Marker({
-            map: this.map,
-            position: currentGroupLatLng
-          })
+        currentGroup.forEach((i) => {
+          this.markers[i].setVisible(false);
+        });
+        
+        groups.push(new Group(
+          this.map,
+          currentGroupLatLng,
+          currentGroup.map((i) => this.markers[i]),
+          '../images/groupedMarkersRed.svg'
         ));
+        
+        // TODO - check the distance between the groups
       }
     }
   }
-  
-  console.log('Groups: ', groups);
+  console.log('groupByRelativeDistance took %n ms', (new Date()).getTime() - startTime);
 };
 
-GroupedMarkers.prototype.fromLatLngToPixel = async function(marker) {
+GroupMarkers.prototype.fromLatLngToPixel = async function(marker) {
   if (!this.isProjectionInitialized) {
     return new Promise(((resolve, reject) => {
       this.methodsWaitingForProjection.push(
@@ -134,7 +274,7 @@ GroupedMarkers.prototype.fromLatLngToPixel = async function(marker) {
   return new Point(point.x, point.y);
 };
 
-GroupedMarkers.prototype.fromPixelToLatLng = async function(point) {
+GroupMarkers.prototype.fromPixelToLatLng = async function(point) {
   if (!this.isProjectionInitialized) {
     return new Promise(((resolve, reject) => {
       this.methodsWaitingForProjection.push(
@@ -155,7 +295,7 @@ GroupedMarkers.prototype.fromPixelToLatLng = async function(point) {
   return new LatLng(position.lat(), position.lng());
 };
 
-GroupedMarkers.prototype.calculateDistance = function(positionA, positionB) {
+GroupMarkers.prototype.calculateDistance = function(positionA, positionB) {
   if (!Point.prototype.isValid(positionA)) {
     throw new Error('First parameter must be a valid position (contains x and y)');
   }
@@ -174,7 +314,7 @@ GroupedMarkers.prototype.calculateDistance = function(positionA, positionB) {
  * @param  {Array} positions      Array of positions. Points must have the following properties: x and y
  * @return {Object}               Point object 
  */
-GroupedMarkers.prototype.getAveragePosition = function(positions) {
+GroupMarkers.prototype.getAveragePosition = function(positions) {
   if (!Array.isArray(positions)) {
     throw new Error(`Expected array of positions. Instead found ${typeof positions}.`)
   }
@@ -201,11 +341,11 @@ GroupedMarkers.prototype.getAveragePosition = function(positions) {
   }
 };
 
-GroupedMarkers.prototype.DEFAULT_SETTINGS = {
-  THRESHOLD: 30, // in pixels
+GroupMarkers.prototype.DEFAULT_SETTINGS = {
+  THRESHOLD: 15, // in pixels
 };
 
-export default GroupedMarkers;
+export default GroupMarkers;
 
 // Add markers 
 //     - add the markers to be "tracked"/calculated
