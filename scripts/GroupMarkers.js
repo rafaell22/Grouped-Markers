@@ -89,18 +89,18 @@ GroupMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
 
 GroupMarkers.prototype.groupByGrid = async function() {
   const startTime = (new Date()).getTime();
-  const cellSize = this.THRESHOLD * 2;
+  const cellSize = await this.fromPixelToLatLng(THRESHOLD * 2);
   const cells = {};
-  let markerPoint;
+  let currentPosition;
   let currentCol;
   let currentRow;
+  
   for (const marker of this.markers) {
-    // TODO - instead of getting pixel point for each marker, convert cellsize and then doo all the calculations in latlngs
+    // TODO - instead of getting pixel point for each marker, convert cellsize and then do all the calculations in latlngs
     //        This way, we only need to convert once
-    markerPoint = await this.fromLatLngToPixel(marker);
-    marker._gPoint = markerPoint;
-    currentRow = Math.floor(markerPoint.y / cellSize);
-    currentCol = Math.floor(markerPoint.x / cellSize);
+    currentPosition = await this.fromLatLngToPixel(marker);
+    currentRow = Math.floor(currentPosition.y / cellSize);
+    currentCol = Math.floor(currentPosition.x / cellSize);
     if (cells[`${currentRow}_${currentCol}`]) {
       cells[`${currentRow}_${currentCol}`].push(marker);
     } else {
@@ -117,10 +117,10 @@ GroupMarkers.prototype.groupByGrid = async function() {
       ) {
         this.groups.push(new Group(
           this.map,
-          await this.fromPixelToLatLng({
-            x: col * cellSize + (cellSize / 2),
-            y: row * cellSize + (cellSize / 2),
-          }),
+          { 
+            lng: col * cellSize + (cellSize / 2),
+            lat: row * cellSize + (cellSize / 2),
+          },
           cells[cell]
         ));
         cells[cell] = null;
@@ -133,10 +133,10 @@ GroupMarkers.prototype.groupByGrid = async function() {
           // check the cell at the top
           this.groups.push(new Group(
             this.map,
-            await this.fromPixelToLatLng({
-              x: col * cellSize + (cellSize / 2),
-              y: row * cellSize,
-            }),
+            {
+              lng: col * cellSize + (cellSize / 2),
+              lat: row * cellSize,
+            },
             cells[cell].concat(cells[`${row - 1}_${col}`])
           ));
 
@@ -149,10 +149,10 @@ GroupMarkers.prototype.groupByGrid = async function() {
           // check the call at the right
           this.groups.push(new Group(
             this.map,
-            await this.fromPixelToLatLng({
-              x: (col + 1) * cellSize,
-              y: row * cellSize + (cellSize / 2),
-            }),
+            {
+              lng: (col + 1) * cellSize,
+              lat: row * cellSize + (cellSize / 2),
+            },
             cells[cell].concat(cells[`${row}_${col + 1}`])
           ));
 
@@ -165,10 +165,10 @@ GroupMarkers.prototype.groupByGrid = async function() {
           // check the cell at the bottom
           this.groups.push(new Group(
             this.map,
-            await this.fromPixelToLatLng({
-              x: col * cellSize + (cellSize / 2),
-              y: (row + 1) * cellSize,
-            }),
+            {
+              lng: col * cellSize + (cellSize / 2),
+              lat: (row + 1) * cellSize,
+            },
             cells[cell].concat(cells[`${row + 1}_${col}`])
           ));
           
@@ -181,10 +181,10 @@ GroupMarkers.prototype.groupByGrid = async function() {
           // check the cell at the left
           this.groups.push(new Group(
             this.map,
-            await this.fromPixelToLatLng({
-              x: col * cellSize,
-              y: row * cellSize + (cellSize / 2),
-            }),
+            {
+              lng: col * cellSize,
+              lat: row * cellSize + (cellSize / 2),
+            },
             cells[cell].concat(cells[`${row}_${col - 1}`])
           ));
 
