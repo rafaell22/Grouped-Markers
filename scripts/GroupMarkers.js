@@ -9,23 +9,23 @@ Point.prototype.isValid = function(point) {
   return point && point.x && point.y;
 }
 
-function LatLng(lat, lng) {
-  this.lat = lat;
-  this.lng = lng;
+function LatLng(latLng) {
+  this.lat = latLng.lat;
+  this.lng = latLng.lng;
 }
 
 LatLng.prototype.isValid = function(position) {
-  return position && position.x && position.y;
+  return position && position.lat && position.lng;
 }
 
-function Group(map, position, markers, icon) {
+function Group(google, map, position, markers, threshold, icon) {
+  this.google = google;
   this.map = map;
+  this.threshold = threshold;
+  
   this.marker = new google.maps.Marker({
     map: map,
-    position: {
-      lat: position.lat,
-      lng: position.lng
-    },
+    position: position,
     icon: {
       url: icon || '../images/groupedMarkersBlue.svg',
       size: {
@@ -89,18 +89,24 @@ GroupMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
 
 GroupMarkers.prototype.groupByGrid = async function() {
   const startTime = (new Date()).getTime();
-  const cellSize = await this.fromPixelToLatLng(THRESHOLD * 2);
+  const origin = await this.fromPixelToLatLng({
+    x: 0,
+    y: 0,
+  })
+  const cellSizePosition = await this.fromPixelToLatLng({
+    x: this.THRESHOLD * 2,
+    y: 0,
+  });
+  const threshold = this.calculateDistance(origin, cellSizePosition);
   const cells = {};
   let currentPosition;
   let currentCol;
   let currentRow;
   
   for (const marker of this.markers) {
-    // TODO - instead of getting pixel point for each marker, convert cellsize and then do all the calculations in latlngs
-    //        This way, we only need to convert once
-    currentPosition = await this.fromLatLngToPixel(marker);
-    currentRow = Math.floor(currentPosition.y / cellSize);
-    currentCol = Math.floor(currentPosition.x / cellSize);
+    currentPosition = marker.position;
+    currentRow = Math.floor(currentPosition.lat() / threshold);
+    currentCol = Math.floor(currentPosition.lng() / threshold);
     if (cells[`${currentRow}_${currentCol}`]) {
       cells[`${currentRow}_${currentCol}`].push(marker);
     } else {
@@ -111,19 +117,18 @@ GroupMarkers.prototype.groupByGrid = async function() {
   for (const cell in cells) {
     const row = cell.split('_')[0];
     const col = cell.split('_')[1];
+    let groupPosition;
+    let secondaryCellIndex;
+    let shouldGroupMarkers = false;
     if (cells[cell]) {
       if (
         cells[cell].length > 1
       ) {
-        this.groups.push(new Group(
-          this.map,
-          { 
-            lng: col * cellSize + (cellSize / 2),
-            lat: row * cellSize + (cellSize / 2),
-          },
-          cells[cell]
-        ));
-        cells[cell] = null;
+        groupPosition = new LatLng({ 
+          lng: col * threshold + (threshold / 2),
+          lat: row * threshold + (threshold / 2),
+        });
+        shouldGroupMarkers = true;
       } else {
         // if a cell has only 1 marker, we try to merge it wtth other cells around it that have only 1 marker
         if (
@@ -131,66 +136,68 @@ GroupMarkers.prototype.groupByGrid = async function() {
           cells[`${row - 1}_${col}`].length === 1
         ) {
           // check the cell at the top
-          this.groups.push(new Group(
-            this.map,
-            {
-              lng: col * cellSize + (cellSize / 2),
-              lat: row * cellSize,
-            },
-            cells[cell].concat(cells[`${row - 1}_${col}`])
-          ));
-
-          cells[cell] = null;
-          cells[`${row - 1}_${col}`] = null;
+          groupPosition = new LatLng({
+            lng: col * threshold + (threshold / 2),
+            lat: row * threshold,
+          });
+          secondaryCellIndex = `${row - 1}_${col}`;
+          shouldGroupMarkers = true;
         } else if(
           cells[`${row}_${col + 1}`] && 
           cells[`${row}_${col + 1}`].length === 1
         ) {
           // check the call at the right
-          this.groups.push(new Group(
-            this.map,
-            {
-              lng: (col + 1) * cellSize,
-              lat: row * cellSize + (cellSize / 2),
-            },
-            cells[cell].concat(cells[`${row}_${col + 1}`])
-          ));
-
-          cells[cell] = null;
-          cells[`${row}_${col + 1}`] = null;
+          groupPosition = new LatLng({
+            lng: (col + 1) * threshold,
+            lat: row * threshold + (threshold / 2),
+          });
+          secondaryCellIndex = `${row}_${col + 1}`;
+          shouldGroupMarkers = true;
         } else if(
           cells[`${row + 1}_${col}`] &&
           cells[`${row + 1}_${col}`].length === 1
         ) {
           // check the cell at the bottom
-          this.groups.push(new Group(
-            this.map,
-            {
-              lng: col * cellSize + (cellSize / 2),
-              lat: (row + 1) * cellSize,
-            },
-            cells[cell].concat(cells[`${row + 1}_${col}`])
-          ));
-          
-          cells[cell] = null;
-          cells[`${row + 1}_${col}`] = null;
+          groupPosition = new LatLng({
+            lng: col * threshold + (threshold / 2),
+            lat: (row + 1) * threshold,
+          });
+          secondaryCellIndex = `${row + 1}_${col}`;
+          shouldGroupMarkers = true;
         } else if(
           cells[`${row}_${col - 1}`] &&
           cells[`${row}_${col - 1}`].length === 1
         ) {
           // check the cell at the left
-          this.groups.push(new Group(
-            this.map,
-            {
-              lng: col * cellSize,
-              lat: row * cellSize + (cellSize / 2),
-            },
-            cells[cell].concat(cells[`${row}_${col - 1}`])
-          ));
-
-          cells[cell] = null;
-          cells[`${row}_${col - 1}`] = null;
+          groupPosition = new LatLng({
+            lng: col * threshold,
+            lat: row * threshold + (threshold / 2),
+          });
+          secondaryCellIndex = `${row}_${col - 1}`;
+          shouldGroupMarkers = true;
         }
+      }
+      
+      if (shouldGroupMarkers) {
+        if (secondaryCellIndex) {
+          this.groups.push(new Group(
+            this.google,
+            this.map,
+            groupPosition,
+            cells[cell].concat(cells[secondaryCellIndex])
+          ));
+          
+          cells[secondaryCellIndex] = null;
+        } else {
+          this.groups.push(new Group(
+            this.google,
+            this.map,
+            groupPosition,
+            cells[cell]
+          ));
+        }
+        
+        cells[cell] = null;
       }
     }
   }
@@ -240,9 +247,11 @@ GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
         });
         
         groups.push(new Group(
+          this.google,
           this.map,
           currentGroupLatLng,
           currentGroup.map((i) => this.markers[i]),
+          null,
           '../images/groupedMarkersRed.svg'
         ));
         
@@ -292,20 +301,26 @@ GroupMarkers.prototype.fromPixelToLatLng = async function(point) {
 
   const projection = this.overlay.getProjection();
   const position = projection.fromContainerPixelToLatLng(point);
-  return new LatLng(position.lat(), position.lng());
+  return new LatLng({
+    lat: position.lat(), 
+    lng: position.lng()
+  });
 };
 
 GroupMarkers.prototype.calculateDistance = function(positionA, positionB) {
-  if (!Point.prototype.isValid(positionA)) {
-    throw new Error('First parameter must be a valid position (contains x and y)');
-  }
-  if (!Point.prototype.isValid(positionB)) {
-    throw new Error('Second parameter must be a valid position (contains x and y)');
+  let dx;
+  let dy;
+  if (positionA.x && positionB.x) {
+    dx = positionA.x - positionB.x;
+  } else {
+    dx = positionA.lng - positionB.lng;
   }
   
-  const dx = positionA.x - positionB.x;
-  const dy = positionA.y - positionB.y;
-  
+  if (positionA.y && positionB.y) {
+    dy = positionA.y - positionB.y;
+  } else {
+    dy = positionA.lat - positionB.lat;
+  }
   return Math.sqrt(dx * dx + dy * dy);
 };
 
