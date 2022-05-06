@@ -44,6 +44,17 @@ function Group(google, map, position, markers, threshold, icon) {
     label: `${markers.length}`,
   });
   
+  this.marker.addListener('click', (function() {
+    console.log('Clicked!');
+    console.log('this.markers: ', this.markers);
+    // circle positions are
+    //   top:          { x: this.x, y: this.y - threshold }
+    //   topRight:     
+    //   right:   { x: this.x + threshold, y: this.y }
+    //   bottom:  { x: this.x, y: this.y + threshold }
+    //   left:    { x: this.x - threshold, y: this.y }
+  }).bind(this));
+  
   this.markers = markers;
   this.markers.forEach(marker => marker.setVisible(false));
 }
@@ -89,13 +100,16 @@ GroupMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
 
 GroupMarkers.prototype.groupByGrid = async function() {
   const startTime = (new Date()).getTime();
+  const mapDiv = this.map.getDiv();
+  const mapBoundingRect = mapDiv.getBoundingClientRect();
+  
   const origin = await this.fromPixelToLatLng({
-    x: 0,
-    y: 0,
+    x: mapBoundingRect.width / 2 - this.THRESHOLD,
+    y: mapBoundingRect.height / 2,
   })
   const cellSizePosition = await this.fromPixelToLatLng({
-    x: this.THRESHOLD * 2,
-    y: 0,
+    x: mapBoundingRect.width / 2 + this.THRESHOLD,
+    y: mapBoundingRect.height / 2,
   });
   const threshold = this.calculateDistance(origin, cellSizePosition);
   const cells = {};

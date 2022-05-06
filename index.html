@@ -62,7 +62,7 @@
         const coords = [];
         let currentLat;
         let currentLng;
-        for(let coordIndex = (10000 - 1); coordIndex > -1; coordIndex--) {
+        for(let coordIndex = (100 - 1); coordIndex > -1; coordIndex--) {
           currentLng = Math.random() * (northEast.lng - southWest.lng) + southWest.lng;
           currentLat = Math.random() * (northEast.lat - southWest.lat) + southWest.lat;
           coords.push({
