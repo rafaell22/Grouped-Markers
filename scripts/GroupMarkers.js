@@ -99,18 +99,32 @@ GroupMarkers.prototype.addMarkers = function(markers, shouldRecalculate) {
 };
 
 GroupMarkers.prototype.groupByGrid = async function() {
+    // at zoom 8 the distortion cause by the projection is around 3% of the pixel distance at latitude 50 and ~4% at 80
+    // I judge that to be acceptable, but the parameter can be changed if necessary
   const startTime = (new Date()).getTime();
-  const mapDiv = this.map.getDiv();
-  const mapBoundingRect = mapDiv.getBoundingClientRect();
   
-  const origin = await this.fromPixelToLatLng({
-    x: mapBoundingRect.width / 2 - this.THRESHOLD,
-    y: mapBoundingRect.height / 2,
-  })
-  const cellSizePosition = await this.fromPixelToLatLng({
-    x: mapBoundingRect.width / 2 + this.THRESHOLD,
-    y: mapBoundingRect.height / 2,
-  });
+  if(this.map.getZoom() >= this.ZOOM_THRESHOLD) {
+      this.calculateGridByLatLng();
+    } else {
+        this.calculateGridByPixel();
+    }
+  
+  console.log('grouByGrid took %n ms', (new Date()).getTime() - startTime);
+};
+
+GroupMarkers.prototype.calculateGridByLatLng = async function() {
+    // at zoom 8 the distortion cause by the projection is around 3% of the pixel distance at latitude 50 and ~4% at 80
+    // I judge that to be acceptable, but the parameter can be changed if necessary
+    const mapDiv = this.map.getDiv();
+    const mapRect = mapDiv.getBoundingClientRect();
+    const origin = await this.fromPixelToLatLng({
+        x: mapRect.width / 2,
+        y: mapRect.height / 2 - this.DISTANCE_THRESHOLD,
+    })
+    const cellSizePosition = await this.fromPixelToLatLng({
+  	  x: mapRect.width / 2,
+	    y: mapRect.height / 2 + this.DISTANCE_THRESHOLD,,
+    });
   const threshold = this.calculateDistance(origin, cellSizePosition);
   const cells = {};
   let currentPosition;
@@ -219,6 +233,119 @@ GroupMarkers.prototype.groupByGrid = async function() {
   console.log('grouByGrid took %n ms', (new Date()).getTime() - startTime);
 };
 
+GroupMarkers.prototype.calculateGridByPixel = async function() {
+    // at zoom 8 the distortion cause by the projection is around 3% of the pixel distance at latitude 50 and ~4% at 80
+    // I judge that to be acceptable, but the parameter can be changed if necessary
+  const startTime = (new Date()).getTime();
+  
+  const cells = {};
+  let currentPoint;
+  let currentCol;
+  let currentRow;
+  for (const marker of this.markers) {
+    currentPoint = this.fromLatLngToPixel(marker.position);
+    currentRow = Math.floor(currentPoint.x / this.DISTANCE_THRESHOLD);
+    currentCol = Math.floor(currentPoint.y / this.DISTANCE_THRESHOLD);
+    if (cells[`${currentRow}_${currentCol}`]) {
+      cells[`${currentRow}_${currentCol}`].push(marker);
+    } else {
+      cells[`${currentRow}_${currentCol}`] = [ marker ];
+    }
+  }
+
+  for (const cell in cells) {
+    const row = cell.split('_')[0];
+    const col = cell.split('_')[1];
+    let groupPosition;
+    let secondaryCellIndex;
+    let shouldGroupMarkers = false;
+    if (cells[cell]) {
+      if (
+        cells[cell].length > 1
+      ) {
+        groupPosition = await this.fromPixelToLatLng({ 
+          x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+          y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+        });
+        shouldGroupMarkers = true;
+      } else {
+        // if a cell has only 1 marker, we try to merge it wtth other cells around it that have only 1 marker
+        if (
+          cells[`${row - 1}_${col}`] &&
+          cells[`${row - 1}_${col}`].length === 1
+        ) {
+          // check the cell at the top
+          groupPosition = await this.fromPixelToLatLng({ 
+            x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+            y: row * this.DISTANCE_THRESHOLD,
+          });
+          secondaryCellIndex = `${row - 1}_${col}`;
+          shouldGroupMarkers = true;
+        } else if(
+          cells[`${row}_${col + 1}`] && 
+          cells[`${row}_${col + 1}`].length === 1
+        ) {
+          // check the call at the right
+          groupPosition = await this.fromPixelToLatLng({ 
+            x: (col + 1) * this.DISTANCE_THRESHOLD,
+            y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+          });
+          secondaryCellIndex = `${row}_${col + 1}`;
+          shouldGroupMarkers = true;
+        } else if(
+          cells[`${row + 1}_${col}`] &&
+          cells[`${row + 1}_${col}`].length === 1
+        ) {
+          // check the cell at the bottom
+          groupPosition = await this.fromPixelToLatLng({ 
+            x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+            y: (row + 1) * this.DISTANCE_THRESHOLD,
+          });
+          secondaryCellIndex = `${row + 1}_${col}`;
+          shouldGroupMarkers = true;
+        } else if(
+          cells[`${row}_${col - 1}`] &&
+          cells[`${row}_${col - 1}`].length === 1
+        ) {
+          // check the cell at the left
+          groupPosition = new LatLng({
+            lng: col * threshold,
+            lat: row * threshold + (threshold / 2),
+          });
+          groupPosition = await this.fromPixelToLatLng({ 
+            x: col * this.DISTANCE_THRESHOLD,
+            y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+          });
+          secondaryCellIndex = `${row}_${col - 1}`;
+          shouldGroupMarkers = true;
+        }
+      }
+      
+      if (shouldGroupMarkers) {
+        if (secondaryCellIndex) {
+          this.groups.push(new Group(
+            this.google,
+            this.map,
+            groupPosition,
+            cells[cell].concat(cells[secondaryCellIndex])
+          ));
+          
+          cells[secondaryCellIndex] = null;
+        } else {
+          this.groups.push(new Group(
+            this.google,
+            this.map,
+            groupPosition,
+            cells[cell]
+          ));
+        }
+        
+        cells[cell] = null;
+      }
+    }
+  }
+};
+
 GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
   const startTime = (new Date()).getTime();
   let currentMarker;
@@ -228,7 +355,7 @@ GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
   let currentGroupLatLng;
   let groups = [];
   let markersWithGroups = {};
-  let points = await Promise.all(this.markers.map(marker => this.fromLatLngToPixel(marker)));
+  let points = await Promise.all(this.markers.map(marker => this.fromLatLngToPixel(marker.position)));
   
   // iterate over markers
   // if 2 markers are close enough, add them to a group
@@ -243,7 +370,7 @@ GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
           points[markerIndex],
           points[otherMarkersIndex],
         );
-        if (currentDistance <= this.THRESHOLD) {
+        if (currentDistance <= this.DISTANCE_THRESHOLD) {
           currentGroup.push(otherMarkersIndex);
           markersWithGroups[otherMarkersIndex] = true;
         }
@@ -276,16 +403,16 @@ GroupMarkers.prototype.groupByRelativeDistance = async function(marker) {
   console.log('groupByRelativeDistance took %n ms', (new Date()).getTime() - startTime);
 };
 
-GroupMarkers.prototype.fromLatLngToPixel = async function(marker) {
+GroupMarkers.prototype.fromLatLngToPixel = async function(latLng) {
   if (!this.isProjectionInitialized) {
     return new Promise(((resolve, reject) => {
       this.methodsWaitingForProjection.push(
-        (async function(marker) {
-          const point = await this.fromLatLngToPixel(marker);
+        (async function(latLng) {
+          const point = await this.fromLatLngToPixel(latLng);
           resolve(point);
           console.log('Resolved!');
           return;
-        }).bind(this, marker)
+        }).bind(this, latLng)
       );
     }).bind(this));
     
@@ -293,7 +420,7 @@ GroupMarkers.prototype.fromLatLngToPixel = async function(marker) {
   }
 
   const projection = this.overlay.getProjection();
-  const point = projection.fromLatLngToContainerPixel(marker.position);
+  const point = projection.fromLatLngToContainerPixel(latLng);
   return new Point(point.x, point.y);
 };
 
@@ -371,7 +498,8 @@ GroupMarkers.prototype.getAveragePosition = function(positions) {
 };
 
 GroupMarkers.prototype.DEFAULT_SETTINGS = {
-  THRESHOLD: 15, // in pixels
+  DISTANCE_THRESHOLD: 30, // in pixels,
+  ZOOM_THRESHOLD: 14,
 };
 
 export default GroupMarkers;
