@@ -123,9 +123,9 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
     })
     const cellSizePosition = await this.fromPixelToLatLng({
   	  x: mapRect.width / 2,
-	    y: mapRect.height / 2 + this.DISTANCE_THRESHOLD,,
+	    y: mapRect.height / 2 + this.DISTANCE_THRESHOLD,
     });
-  const threshold = this.calculateDistance(origin, cellSizePosition);
+  const cellSize = this.calculateDistance(origin, cellSizePosition);
   const cells = {};
   let currentPosition;
   let currentCol;
@@ -133,8 +133,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
   
   for (const marker of this.markers) {
     currentPosition = marker.position;
-    currentRow = Math.floor(currentPosition.lat() / threshold);
-    currentCol = Math.floor(currentPosition.lng() / threshold);
+    currentRow = Math.floor(currentPosition.lat() / cellSize);
+    currentCol = Math.floor(currentPosition.lng() / cellSize);
     if (cells[`${currentRow}_${currentCol}`]) {
       cells[`${currentRow}_${currentCol}`].push(marker);
     } else {
@@ -153,8 +153,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
         cells[cell].length > 1
       ) {
         groupPosition = new LatLng({ 
-          lng: col * threshold + (threshold / 2),
-          lat: row * threshold + (threshold / 2),
+          lng: col * cellSize + (cellSize / 2),
+          lat: row * cellSize + (cellSize / 2),
         });
         shouldGroupMarkers = true;
       } else {
@@ -165,8 +165,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
         ) {
           // check the cell at the top
           groupPosition = new LatLng({
-            lng: col * threshold + (threshold / 2),
-            lat: row * threshold,
+            lng: col * cellSize + (cellSize / 2),
+            lat: row * cellSize,
           });
           secondaryCellIndex = `${row - 1}_${col}`;
           shouldGroupMarkers = true;
@@ -176,8 +176,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
         ) {
           // check the call at the right
           groupPosition = new LatLng({
-            lng: (col + 1) * threshold,
-            lat: row * threshold + (threshold / 2),
+            lng: (col + 1) * cellSize,
+            lat: row * cellSize + (cellSize / 2),
           });
           secondaryCellIndex = `${row}_${col + 1}`;
           shouldGroupMarkers = true;
@@ -187,8 +187,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
         ) {
           // check the cell at the bottom
           groupPosition = new LatLng({
-            lng: col * threshold + (threshold / 2),
-            lat: (row + 1) * threshold,
+            lng: col * cellSize + (cellSize / 2),
+            lat: (row + 1) * cellSize,
           });
           secondaryCellIndex = `${row + 1}_${col}`;
           shouldGroupMarkers = true;
@@ -198,8 +198,8 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
         ) {
           // check the cell at the left
           groupPosition = new LatLng({
-            lng: col * threshold,
-            lat: row * threshold + (threshold / 2),
+            lng: col * cellSize,
+            lat: row * cellSize + (cellSize / 2),
           });
           secondaryCellIndex = `${row}_${col - 1}`;
           shouldGroupMarkers = true;
@@ -229,23 +229,21 @@ GroupMarkers.prototype.calculateGridByLatLng = async function() {
       }
     }
   }
-  
-  console.log('grouByGrid took %n ms', (new Date()).getTime() - startTime);
 };
 
 GroupMarkers.prototype.calculateGridByPixel = async function() {
     // at zoom 8 the distortion cause by the projection is around 3% of the pixel distance at latitude 50 and ~4% at 80
     // I judge that to be acceptable, but the parameter can be changed if necessary
   const startTime = (new Date()).getTime();
-  
+  const cellSize = 2 * this.DISTANCE_THRESHOLD;
   const cells = {};
   let currentPoint;
   let currentCol;
   let currentRow;
   for (const marker of this.markers) {
     currentPoint = this.fromLatLngToPixel(marker.position);
-    currentRow = Math.floor(currentPoint.x / this.DISTANCE_THRESHOLD);
-    currentCol = Math.floor(currentPoint.y / this.DISTANCE_THRESHOLD);
+    currentRow = Math.floor(currentPoint.x / cellSize);
+    currentCol = Math.floor(currentPoint.y / cellSize);
     if (cells[`${currentRow}_${currentCol}`]) {
       cells[`${currentRow}_${currentCol}`].push(marker);
     } else {
@@ -264,8 +262,8 @@ GroupMarkers.prototype.calculateGridByPixel = async function() {
         cells[cell].length > 1
       ) {
         groupPosition = await this.fromPixelToLatLng({ 
-          x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
-          y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+          x: col * cellSize + (cellSize / 2),
+          y: row * cellSize + (cellSize / 2),
         });
         shouldGroupMarkers = true;
       } else {
@@ -276,8 +274,8 @@ GroupMarkers.prototype.calculateGridByPixel = async function() {
         ) {
           // check the cell at the top
           groupPosition = await this.fromPixelToLatLng({ 
-            x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
-            y: row * this.DISTANCE_THRESHOLD,
+            x: col * cellSize + (cellSize / 2),
+            y: row * cellSize,
           });
           secondaryCellIndex = `${row - 1}_${col}`;
           shouldGroupMarkers = true;
@@ -287,8 +285,8 @@ GroupMarkers.prototype.calculateGridByPixel = async function() {
         ) {
           // check the call at the right
           groupPosition = await this.fromPixelToLatLng({ 
-            x: (col + 1) * this.DISTANCE_THRESHOLD,
-            y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+            x: (col + 1) * cellSize,
+            y: row * cellSize + (cellSize / 2),
           });
           secondaryCellIndex = `${row}_${col + 1}`;
           shouldGroupMarkers = true;
@@ -298,8 +296,8 @@ GroupMarkers.prototype.calculateGridByPixel = async function() {
         ) {
           // check the cell at the bottom
           groupPosition = await this.fromPixelToLatLng({ 
-            x: col * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
-            y: (row + 1) * this.DISTANCE_THRESHOLD,
+            x: col * cellSize + (cellSize / 2),
+            y: (row + 1) * cellSize,
           });
           secondaryCellIndex = `${row + 1}_${col}`;
           shouldGroupMarkers = true;
@@ -313,8 +311,8 @@ GroupMarkers.prototype.calculateGridByPixel = async function() {
             lat: row * threshold + (threshold / 2),
           });
           groupPosition = await this.fromPixelToLatLng({ 
-            x: col * this.DISTANCE_THRESHOLD,
-            y: row * this.DISTANCE_THRESHOLD + (this.DISTANCE_THRESHOLD / 2),
+            x: col * cellSize,
+            y: row * cellSize + (cellSize / 2),
           });
           secondaryCellIndex = `${row}_${col - 1}`;
           shouldGroupMarkers = true;
@@ -499,7 +497,7 @@ GroupMarkers.prototype.getAveragePosition = function(positions) {
 
 GroupMarkers.prototype.DEFAULT_SETTINGS = {
   DISTANCE_THRESHOLD: 30, // in pixels,
-  ZOOM_THRESHOLD: 14,
+  ZOOM_THRESHOLD: 8,
 };
 
 export default GroupMarkers;
