@@ -20,7 +20,7 @@
   <body>
     <div id='map'></div>
     
-    <script src="https://cdn.jsdelivr.net/gh/rafaell22/Console@1.1.0/console.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/gh/rafaell22/Console@1.1.0/console.js"></script> -->
     <script type="module">
       import env from './scripts/env.js';
       import { loadGoogleMapsLibrary } from './scripts/utils.js';
@@ -58,8 +58,8 @@
           gridContext.stroke();
       }
       
-      function createSampleMarkers(gMap) {
-          const bounds = gMap.getBounds();
+      async function createSampleMarkers(gMap) {
+          const bounds = await groupMarkers.getMapBounds();
           const gMarkers = [];
 
           const northEast = {
@@ -72,6 +72,9 @@
               lng: bounds.east,
           };
         
+          console.log('northEast: ', northEast);
+          console.log('southWest: ', southWest);
+        
           const coords = [];
           let currentLat;
           let currentLng;
@@ -83,7 +86,7 @@
                   lng: currentLng,
               })
           }
-        
+          console.log('coords: ', coords);
           console.log('Creating markers...');
           for(let coordIndex = (coords.length - 1); coordIndex > -1; coordIndex--) {
               gMarkers.push(new google.maps.Marker({
@@ -96,56 +99,54 @@
       }
       
       async function showGridByLatLng(gMap, groupMarkers) {
-          const mapBoundingRect = gMap.getDiv().getBoundingClientRect();
-          console.log('mapDiv: ', gMap.getDiv());
-          console.log('mapBoundingRect: ', mapBoundingRect);
-          let cellSize=  groupMarkers.calculateDistance(
-			  await groupMarkers.fromPixelToLatLng({
-             	 x: mapBoundingRect.width / 2,
-                  y: mapBoundingRect.height / 2 - groupMarkers.DISTANCE_THRESHOLD,
-              }), 
-              await groupMarkers.fromPixelToLatLng({
-                  x: mapBoundingRect.width / 2,
-                  y: mapBoundingRect.height + groupMarkers.DISTANCE_THRESHOLD,
-              })
-          );
-          console.log('cellSize: ', cellSize);
-          const bounds = gMap.getBounds();
-          const rows = Math.ceil((bounds.north - bounds.south) / cellSize);
-          const columns = Math.ceil((bounds.east - bounds.west) / cellSize);
+        const mapBoundingRect = gMap.getDiv().getBoundingClientRect();
 
-          // draw the rows
-          let currentPol;
-          for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
-              currentPol = new google.maps.Polyline({
-                  map: gMap,
-                  path: [
-                      {
-                          lat: rowIndex * cellSize + bounds.south,
-                          lng: bounds.east
-                      },
-                      {
-                          lat: rowIndex * cellSize + bounds.south,
-                          lng: bounds.west
-                      }
-                  ]
-              });
-          }
-          for(let colIndex = 0; colIndex < columns; colIndex++) {
-              currentPol = new google.maps.Polyline({
-                  map: gMap,
-                  path: [
-                      {
-                          lat: bounds.south,
-                          lng: bounds.west + colIndex * cellSize
-                      },
-                      {
-                          lat: bounds.north,
-                          lng: bounds.west + colIndex * cellSize
-                      }
-                  ]
-              });
-          }
+        let cellSize=  groupMarkers.calculateDistance(
+  			  await groupMarkers.fromPixelToLatLng({
+         	  x: mapBoundingRect.width / 2,
+            y: mapBoundingRect.height / 2 - groupMarkers.DISTANCE_THRESHOLD,
+          }), 
+          await groupMarkers.fromPixelToLatLng({
+            x: mapBoundingRect.width / 2,
+            y: mapBoundingRect.height / 2 + groupMarkers.DISTANCE_THRESHOLD,
+          })
+        );
+        let bounds = await groupMarkers.getMapBounds();
+        const rows = Math.ceil((bounds.north - bounds.south) / cellSize);
+        const columns = Math.ceil((bounds.east - bounds.west) / cellSize);
+
+        // draw the rows
+        let currentPol;
+        for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
+          currentPol = new google.maps.Polyline({
+            map: gMap,
+            path: [
+              {
+                lat: rowIndex * cellSize + bounds.south,
+                lng: bounds.east
+              },
+              {
+                lat: rowIndex * cellSize + bounds.south,
+                lng: bounds.west
+              }
+            ]
+          });
+        }
+        for(let colIndex = 0; colIndex < columns; colIndex++) {
+          currentPol = new google.maps.Polyline({
+            map: gMap,
+            path: [
+              {
+                lat: bounds.south,
+                lng: bounds.west + colIndex * cellSize
+              },
+              {
+                lat: bounds.north,
+                lng: bounds.west + colIndex * cellSize
+              }
+            ]
+          });
+        }
       }
     
       // Load google maps library
@@ -179,7 +180,7 @@
         await showGridByLatLng(gMap, groupMarkers);
         
         console.log('Genetrating sample data...');
-        createSampleMarkers(gMap);
+        await createSampleMarkers(gMap, groupMarkers);
         
         for(let markerIndex = (gMarkers.length - 1); markerIndex > -1; markerIndex--) {
           groupMarkers.addMarker(gMarkers[markerIndex]);

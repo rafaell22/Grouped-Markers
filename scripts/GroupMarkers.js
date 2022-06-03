@@ -78,7 +78,8 @@ function GroupMarkers(google, map, options) {
     this.isProjectionInitialized = true;
     
     for(let methodIndex = 0; methodIndex < this.methodsWaitingForProjection.length; methodIndex++) {      
-      setTimeout(this.methodsWaitingForProjection[methodIndex], 2000);
+      this.methodsWaitingForProjection[methodIndex]();
+      // setTimeout(this.methodsWaitingForProjection[methodIndex], 2000);
     }
   }).bind(this);
   this.overlay.setMap(map);
@@ -421,6 +422,28 @@ GroupMarkers.prototype.fromLatLngToPixel = async function(latLng) {
   const point = projection.fromLatLngToContainerPixel(latLng);
   return new Point(point.x, point.y);
 };
+
+GroupMarkers.prototype.getMapBounds = async function() {
+  if (!this.isProjectionInitialized) {
+    return new Promise(((resolve, reject) => {
+      this.methodsWaitingForProjection.push(
+        (async function() {
+          const position = await this.getMapBounds();
+          resolve(position);
+          console.log('Resolved!');
+          return;
+        }).bind(this)
+      );
+    }).bind(this));
+    
+    return;
+  }
+
+  const projection = this.overlay.getProjection();
+  const visibleRegion = projection.getVisibleRegion();
+
+  return visibleRegion.latLngBounds.toJSON();
+}
 
 GroupMarkers.prototype.fromPixelToLatLng = async function(point) {
   if (!this.isProjectionInitialized) {
