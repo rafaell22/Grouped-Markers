@@ -24,7 +24,7 @@
     <script type="module">
       import env from './scripts/env.js';
       import { loadGoogleMapsLibrary } from './scripts/utils.js';
-      import GroupMarkers from './scripts/GroupMarkers.js';
+      import MapSpiders from './scripts/MapSpiders.js';
     
       function showGridByPixel() {
           const gridCanvas = document.createElement('CANVAS');
@@ -37,9 +37,13 @@
           const gridContext = gridCanvas.getContext('2d');
         
           // calculate and draw the grid over the map
-          let cellSize = GroupMarkers.prototype.DEFAULT_SETTINGS.THRESHOLD * 2; // in pixels, double the threshold value
+          let cellSize = MapSpiders.prototype.DEFAULT_SETTINGS.THRESHOLD * 2; // in pixels, double the threshold value
           let rows = Math.ceil(gridCanvas.height / cellSize);
           let columns = Math.ceil(gridCanvas.width / cellSize);
+          
+          console.log('rows: ', rows);
+          console.log('cols: ', columns);
+          
           // draw the rows
           gridContext.beginPath();
           for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
@@ -56,10 +60,12 @@
               gridContext.fillText(columnIndex, columnIndex * cellSize + 10, 10);
           }
           gridContext.stroke();
+          
+          document.querySelector('body').appendChild(gridCanvas);
       }
       
-      async function createSampleMarkers(gMap) {
-          const bounds = await groupMarkers.getMapBounds();
+      async function createSampleMarkers(gMap, mapSpiders, coords = []) {
+          const bounds = await mapSpiders.getMapBounds();
           const gMarkers = [];
 
           const northEast = {
@@ -71,22 +77,24 @@
               lat: bounds.south,
               lng: bounds.east,
           };
-        
+          
           console.log('northEast: ', northEast);
           console.log('southWest: ', southWest);
         
-          const coords = [];
-          let currentLat;
-          let currentLng;
-          for(let coordIndex = (100 - 1); coordIndex > -1; coordIndex--) {
-              currentLng = Math.random() * (northEast.lng - southWest.lng) + southWest.lng;
-              currentLat = Math.random() * (northEast.lat - southWest.lat) + southWest.lat;
-              coords.push({
-                  lat: currentLat,
-                  lng: currentLng,
-              })
+          if (coords.length === 0) {
+            let currentLat;
+            let currentLng;
+            for(let coordIndex = (100 - 1); coordIndex > -1; coordIndex--) {
+                currentLng = Math.random() * (northEast.lng - southWest.lng) + southWest.lng;
+                currentLat = Math.random() * (northEast.lat - southWest.lat) + southWest.lat;
+                coords.push({
+                    lat: currentLat,
+                    lng: currentLng,
+                })
+            }
           }
           console.log('coords: ', coords);
+
           console.log('Creating markers...');
           for(let coordIndex = (coords.length - 1); coordIndex > -1; coordIndex--) {
               gMarkers.push(new google.maps.Marker({
@@ -98,20 +106,20 @@
           return gMarkers;
       }
       
-      async function showGridByLatLng(gMap, groupMarkers) {
+      async function showGridByLatLng(gMap, mapSpiders) {
         const mapBoundingRect = gMap.getDiv().getBoundingClientRect();
 
-        let cellSize=  groupMarkers.calculateDistance(
-  			  await groupMarkers.fromPixelToLatLng({
+        let cellSize=  mapSpiders.calculateDistance(
+  			  await mapSpiders.fromPixelToLatLng({
          	  x: mapBoundingRect.width / 2,
-            y: mapBoundingRect.height / 2 - groupMarkers.DISTANCE_THRESHOLD,
+            y: mapBoundingRect.height / 2 - mapSpiders.DISTANCE_THRESHOLD,
           }), 
-          await groupMarkers.fromPixelToLatLng({
+          await mapSpiders.fromPixelToLatLng({
             x: mapBoundingRect.width / 2,
-            y: mapBoundingRect.height / 2 + groupMarkers.DISTANCE_THRESHOLD,
+            y: mapBoundingRect.height / 2 + mapSpiders.DISTANCE_THRESHOLD,
           })
         );
-        let bounds = await groupMarkers.getMapBounds();
+        let bounds = await mapSpiders.getMapBounds();
         const rows = Math.ceil((bounds.north - bounds.south) / cellSize);
         const columns = Math.ceil((bounds.east - bounds.west) / cellSize);
 
@@ -158,8 +166,8 @@
       
       let gMap;
       let gMarkers = [];
-      let gGroupMarkers = [];
-      let groupMarkers;
+      let gMapSpiders = [];
+      let mapSpiders;
       window.initMap = async () => {
         console.log('Initializing the map...');
         
@@ -174,20 +182,30 @@
         console.log('Map initialized!'); 
         
         console.log('Combining markers...');
-        groupMarkers = new GroupMarkers(google, gMap);
+        mapSpiders = new MapSpiders(google, gMap);
         
         console.log('Building visual debugging tools...');
-        await showGridByLatLng(gMap, groupMarkers);
+        // await showGridByPixel();
+        await showGridByLatLng(gMap, mapSpiders);
         
         console.log('Genetrating sample data...');
-        await createSampleMarkers(gMap, groupMarkers);
+        gMarkers = await createSampleMarkers(gMap, mapSpiders, [
+          {
+            lat: 49.5,
+            lng: -97
+          },
+          {
+            lat: 49.47,
+            lng: -97
+          }
+        ]);
         
         for(let markerIndex = (gMarkers.length - 1); markerIndex > -1; markerIndex--) {
-          groupMarkers.addMarker(gMarkers[markerIndex]);
+          mapSpiders.addMarker(gMarkers[markerIndex]);
         }
         
-        await groupMarkers.groupByGrid();
-        await groupMarkers.groupByRelativeDistance();
+        await mapSpiders.groupByGrid();
+        // await mapSpiders.groupByRelativeDistance();
         console.log('Markers combined!');
       }
     </script>
