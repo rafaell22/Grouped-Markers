@@ -20,7 +20,7 @@
   <body>
     <div id='map'></div>
     
-    <!-- <script src="https://cdn.jsdelivr.net/gh/rafaell22/Console@1.1.0/console.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/gh/rafaell22/Console@1.1.0/console.js"></script>
     <script type="module">
       import env from './scripts/env.js';
       import { loadGoogleMapsLibrary } from './scripts/utils.js';
@@ -40,9 +40,6 @@
           let cellSize = MapSpiders.prototype.DEFAULT_SETTINGS.THRESHOLD * 2; // in pixels, double the threshold value
           let rows = Math.ceil(gridCanvas.height / cellSize);
           let columns = Math.ceil(gridCanvas.width / cellSize);
-          
-          console.log('rows: ', rows);
-          console.log('cols: ', columns);
           
           // draw the rows
           gridContext.beginPath();
@@ -110,19 +107,24 @@
         const mapBoundingRect = gMap.getDiv().getBoundingClientRect();
 
         let cellSize=  mapSpiders.calculateDistance(
-  			  await mapSpiders.fromPixelToLatLng({
+  	    await mapSpiders.fromPixelToLatLng({
          	  x: mapBoundingRect.width / 2,
-            y: mapBoundingRect.height / 2 - mapSpiders.DISTANCE_THRESHOLD,
+               y: mapBoundingRect.height / 2 - mapSpiders.DISTANCE_THRESHOLD,
           }), 
           await mapSpiders.fromPixelToLatLng({
-            x: mapBoundingRect.width / 2,
-            y: mapBoundingRect.height / 2 + mapSpiders.DISTANCE_THRESHOLD,
+              x: mapBoundingRect.width / 2,
+              y: mapBoundingRect.height / 2 + mapSpiders.DISTANCE_THRESHOLD,
           })
         );
+        console.log('grid/cellSize: ', cellSize);
         let bounds = await mapSpiders.getMapBounds();
         const rows = Math.ceil((bounds.north - bounds.south) / cellSize);
         const columns = Math.ceil((bounds.east - bounds.west) / cellSize);
 
+        const firstRow = Math.floor(bounds.south / cellSize);
+        const firstCol = Math.floor(bounds.west / cellSize);
+        console.log('firstRow: ', firstRow);
+        console.log('firstCol: ', firstCol);
         // draw the rows
         let currentPol;
         for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
@@ -130,11 +132,13 @@
             map: gMap,
             path: [
               {
-                lat: rowIndex * cellSize + bounds.south,
+                lat: (firstRow + rowIndex) * cellSize,
+                // lat: rowIndex * cellSize + bounds.south,
                 lng: bounds.east
               },
-              {
-                lat: rowIndex * cellSize + bounds.south,
+              { 
+                lat: (firstRow + rowIndex) * cellSize,
+                // lat: rowIndex * cellSize + bounds.south,
                 lng: bounds.west
               }
             ]
@@ -146,11 +150,13 @@
             path: [
               {
                 lat: bounds.south,
-                lng: bounds.west + colIndex * cellSize
+                lng: (firstCol + colIndex) * cellSize,
+                // lng: bounds.west + colIndex * cellSize
               },
               {
                 lat: bounds.north,
-                lng: bounds.west + colIndex * cellSize
+                lng: (firstCol + colIndex) * cellSize,
+                // lng: bounds.west + colIndex * cellSize
               }
             ]
           });
@@ -191,12 +197,12 @@
         console.log('Genetrating sample data...');
         gMarkers = await createSampleMarkers(gMap, mapSpiders, [
           {
-            lat: 49.5,
+            lat: 49.52,
             lng: -97
           },
           {
-            lat: 49.47,
-            lng: -97
+            lat: 49.50,
+            lng: -96.98
           }
         ]);
         

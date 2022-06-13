@@ -128,21 +128,30 @@ MapSpiders.prototype.calculateGridByLatLng = async function() {
 	    y: mapRect.height / 2 + this.DISTANCE_THRESHOLD,
     });
   const cellSize = this.calculateDistance(origin, cellSizePosition);
+  console.log('spider/cellSize: ', cellSize);
   const cells = {};
   let currentPosition;
   let currentCol;
   let currentRow;
   
+  console.log('spider/this markers.length: ', this.markers.length);
+  
   for (const marker of this.markers) {
     currentPosition = marker.position;
+    console.log('spiders/lat: ', currentPosition.lat());
+    console.log('spiders/lng: ', currentPosition.lng());
     currentRow = Math.floor(currentPosition.lat() / cellSize);
+    console.log('spider/currentRow: ', currentRow);
     currentCol = Math.floor(currentPosition.lng() / cellSize);
+    console.log('spider/currentCol: ', currentCol);
     if (cells[`${currentRow}_${currentCol}`]) {
       cells[`${currentRow}_${currentCol}`].push(marker);
     } else {
       cells[`${currentRow}_${currentCol}`] = [ marker ];
     }
   }
+  
+  console.log('spider/cells: ', Object.keys(cells));
 
   for (const cell in cells) {
     const row = cell.split('_')[0];
@@ -154,17 +163,26 @@ MapSpiders.prototype.calculateGridByLatLng = async function() {
       if (
         cells[cell].length > 1
       ) {
-        groupPosition = new LatLng({ 
-          lng: col * cellSize + (cellSize / 2),
-          lat: row * cellSize + (cellSize / 2),
-        });
-        shouldMapSpiders = true;
+          console.log(1);
+          groupPosition = new LatLng({ 
+            lng: col * cellSize + (cellSize / 2),
+            lat: row * cellSize + (cellSize / 2),
+          });
+          console.log('spider/row: ', row);
+          console.log('spider/col: ', col);
+          console.log('spider/col * cellSize: ', col * cellSize);
+          console.log('spider/row * cellSize: ', row * cellSize);
+          console.log('spider/col * cellSize: ', col * cellSize + cellSize);
+          console.log('spider/row * cellSize: ', row * cellSize + cellSize);
+          console.log('spider/groupPosition: ', groupPosition);
+          shouldMapSpiders = true;
       } else {
         // if a cell has only 1 marker, we try to merge it wtth other cells around it that have only 1 marker
         if (
           cells[`${row - 1}_${col}`] &&
           cells[`${row - 1}_${col}`].length === 1
         ) {
+            console.log(2);
           // check the cell at the top
           groupPosition = new LatLng({
             lng: col * cellSize + (cellSize / 2),
