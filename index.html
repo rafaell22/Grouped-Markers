@@ -28,6 +28,7 @@
     
       function showGridByPixel() {
           const gridCanvas = document.createElement('CANVAS');
+          document.querySelector('body').appendChild(gridCanvas);
           gridCanvas.id = 'grid';
           gridCanvas.style.top = '0px';
           gridCanvas.style.left = '0px';
@@ -37,10 +38,10 @@
           const gridContext = gridCanvas.getContext('2d');
         
           // calculate and draw the grid over the map
-          let cellSize = MapSpiders.prototype.DEFAULT_SETTINGS.THRESHOLD * 2; // in pixels, double the threshold value
+          let cellSize = MapSpiders.prototype.DEFAULT_SETTINGS.DISTANCE_THRESHOLD * 2; // in pixels, double the threshold value
           let rows = Math.ceil(gridCanvas.height / cellSize);
           let columns = Math.ceil(gridCanvas.width / cellSize);
-          
+
           // draw the rows
           gridContext.beginPath();
           for(let rowIndex = 0; rowIndex < rows; rowIndex++) {
@@ -57,8 +58,6 @@
               gridContext.fillText(columnIndex, columnIndex * cellSize + 10, 10);
           }
           gridContext.stroke();
-          
-          document.querySelector('body').appendChild(gridCanvas);
       }
       
       async function createSampleMarkers(gMap, mapSpiders, coords = []) {
