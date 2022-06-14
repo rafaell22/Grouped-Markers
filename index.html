@@ -116,7 +116,7 @@
               y: mapBoundingRect.height / 2 + mapSpiders.DISTANCE_THRESHOLD,
           })
         );
-        console.log('grid/cellSize: ', cellSize);
+
         let bounds = await mapSpiders.getMapBounds();
         const rows = Math.ceil((bounds.north - bounds.south) / cellSize);
         const columns = Math.ceil((bounds.east - bounds.west) / cellSize);
@@ -180,7 +180,7 @@
         gMap = new google.maps.Map(
           elMap,
           {
-            zoom: 10,
+            zoom: 6,
             center: { lat: 49.5, lng: -97 },
             // mapTypeId: 'roadmap',
           }
@@ -191,8 +191,8 @@
         mapSpiders = new MapSpiders(google, gMap);
         
         console.log('Building visual debugging tools...');
-        // await showGridByPixel();
-        await showGridByLatLng(gMap, mapSpiders);
+        await showGridByPixel();
+        // await showGridByLatLng(gMap, mapSpiders);
         
         console.log('Genetrating sample data...');
         gMarkers = await createSampleMarkers(gMap, mapSpiders, [
@@ -203,15 +203,27 @@
           {
             lat: 49.50,
             lng: -96.98
-          }
+          },
+          {
+            lat: 49.52,
+            lng: -96.94
+          },
+          {
+            lat: 49.52,
+            lng: -96.90
+          },
+          {
+            lat: 49.52,
+            lng: -96.84
+          },
         ]);
         
         for(let markerIndex = (gMarkers.length - 1); markerIndex > -1; markerIndex--) {
           mapSpiders.addMarker(gMarkers[markerIndex]);
         }
         
-        await mapSpiders.groupByGrid();
-        // await mapSpiders.groupByRelativeDistance();
+        // await mapSpiders.groupByGrid();
+        await mapSpiders.groupByRelativeDistance();
         console.log('Markers combined!');
       }
     </script>
